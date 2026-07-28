@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>장례비용 예상 계산기 | 대명휴장례식장</title>
+<style>
+  /* =====================================================
+     가격표는 이 파일 맨 아래쪽 자바스크립트 코드 안의
+     "PRICES" 부분에 모여 있습니다. (Ctrl+F로 "PRICES" 검색)
+     여기부터 이어지는 부분은 전부 디자인(화면 모양) 관련 CSS라서
+     가격을 바꿀 때는 건드리지 않으셔도 됩니다.
+     ===================================================== */
+
+  :root {
+    --navy: #1e3a5f;
+    --navy-dark: #14273f;
+    --navy-light: #2c5282;
+    --ivory: #f7f8fa;
+    --white: #ffffff;
+    --border: #d9e0e8;
+    --text-main: #1a1a1a;
+    --text-sub: #5a6472;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: "Malgun Gothic", "맑은 고딕", -apple-system, sans-serif;
+    background: var(--ivory);
+    color: var(--text-main);
+    line-height: 1.6;
+  }
+
+  .wrap {
+    max-width: 480px;
+    margin: 0 auto;
+    background: var(--white);
+    min-height: 100vh;
+    box-shadow: 0 0 24px rgba(0,0,0,0.06);
+    padding-bottom: 96px; /* 하단 고정 합계 바에 내용이 가려지지 않도록 */
+  }
+
+  header {
+    background: var(--navy);
+    color: var(--white);
+    padding: 28px 20px 24px;
+    text-align: center;
+  }
+
+  header .company {
+    font-size: 1.05rem;
+    opacity: 0.85;
+    margin-bottom: 6px;
+  }
+
+  header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  header p {
+    margin: 10px 0 0;
+    font-size: 0.95rem;
+    opacity: 0.85;
+    line-height: 1.6;
+  }
+
+  header p .header-sub {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 0.78rem;
+    opacity: 0.7;
+  }
+
+  main {
+    padding: 20px 16px 30px;
+  }
+
+  /* ---- 대분류 카드 (접었다 펼 수 있음) ---- */
+  .cat-card {
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 14px;
+    overflow: hidden;
+    background: var(--white);
+  }
+
+  .cat-card > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 16px 18px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--navy);
+    background: var(--ivory);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .cat-card > summary::-webkit-details-marker { display: none; }
+
+  .cat-card > summary .arrow {
+    font-size: 0.9rem;
+    color: var(--navy-light);
+    transition: transform 0.15s;
+  }
+
+  .cat-card[open] > summary .arrow {
+    transform: rotate(90deg);
+  }
+
+  .cat-card > summary .cat-subtotal {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--navy-light);
+    margin-left: auto;
+    margin-right: 10px;
+  }
+
+  .cat-body {
+    padding: 16px 18px 18px;
+    border-top: 1px solid var(--border);
+  }
+
+  .shared-input {
+    margin-bottom: 16px;
+  }
+
+  .shared-input label {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 8px;
+  }
+
+  .item-group {
+    margin-bottom: 18px;
+  }
+
+  .item-group:last-child {
+    margin-bottom: 0;
+  }
+
+  .item-name {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 8px;
+  }
+
+  .sub-group {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sub-group:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  .sub-title {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--navy-light);
+    margin-bottom: 10px;
+  }
+
+  .item-note {
+    font-size: 0.8rem;
+    color: var(--text-sub);
+    margin-top: 6px;
+  }
+
+  .cat-description {
+    font-size: 0.85rem;
+    color: var(--text-sub);
+    margin-bottom: 16px;
+  }
+
+  .option-item {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .option-item .option-note {
+    margin: 4px 0 0 4px;
+  }
+
+  .fixed-row {
+    background: #eef3f8;
+    border-color: var(--navy-light);
+    cursor: default;
+  }
+
+  .fixed-row input[type="checkbox"]:disabled {
+    opacity: 0.6;
+  }
+
+  .badge-required {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--white);
+    background: var(--navy-light);
+    padding: 2px 8px;
+    border-radius: 20px;
+    flex-shrink: 0;
+  }
+
+  .option-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .option-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+
+  .option-row:has(input:checked) {
+    border-color: var(--navy-light);
+    background: #eef3f8;
+  }
+
+  .option-row input {
+    width: 19px;
+    height: 19px;
+    accent-color: var(--navy);
+    flex-shrink: 0;
+  }
+
+  .option-row .option-price {
+    margin-left: auto;
+    color: var(--text-sub);
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+
+  .qty-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .qty-row input[type="number"] {
+    width: 90px;
+    flex-shrink: 0;
+  }
+
+  .qty-row .qty-price {
+    font-size: 0.85rem;
+    color: var(--text-sub);
+  }
+
+  select,
+  input[type="number"] {
+    padding: 10px 12px;
+    font-size: 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: var(--white);
+    color: var(--text-main);
+    font-family: inherit;
+    width: 100%;
+  }
+
+  select:focus,
+  input[type="number"]:focus {
+    outline: none;
+    border-color: var(--navy-light);
+  }
+
+  /* ---- 영수증(선택 내역) 카드 ---- */
+  .receipt-card {
+    margin-top: 20px;
+    padding: 20px 18px;
+    background: var(--navy);
+    border-radius: 14px;
+    color: var(--white);
+  }
+
+  .receipt-title {
+    font-size: 1rem;
+    opacity: 0.85;
+    text-align: center;
+  }
+
+  .receipt-total {
+    font-size: 1.8rem;
+    font-weight: 800;
+    text-align: center;
+    margin: 8px 0 16px;
+  }
+
+  .receipt-list {
+    border-top: 1px solid rgba(255,255,255,0.25);
+    padding-top: 12px;
+  }
+
+  .receipt-empty {
+    text-align: center;
+    font-size: 0.9rem;
+    opacity: 0.7;
+    padding: 6px 0;
+  }
+
+  .receipt-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 0.9rem;
+    padding: 6px 0;
+    border-bottom: 1px dashed rgba(255,255,255,0.2);
+  }
+
+  .receipt-line:last-child {
+    border-bottom: none;
+  }
+
+  .receipt-line .rl-name {
+    opacity: 0.9;
+  }
+
+  .receipt-line .rl-amount {
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  /* ---- 전화 상담 CTA ---- */
+  .cta-box {
+    margin-top: 20px;
+    padding: 22px 18px;
+    background: var(--ivory);
+    border: 2px solid var(--navy);
+    border-radius: 14px;
+    text-align: center;
+  }
+
+  .cta-box .cta-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 14px;
+    line-height: 1.6;
+    word-break: keep-all;
+  }
+
+  .cta-box a.phone-btn {
+    display: block;
+    background: var(--navy);
+    color: var(--white);
+    text-decoration: none;
+    font-size: 1.4rem;
+    font-weight: 800;
+    padding: 16px;
+    border-radius: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  /* ---- 화면 하단 고정 합계 바 ---- */
+  .sticky-total {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--navy-dark);
+    box-shadow: 0 -3px 12px rgba(0,0,0,0.25);
+    z-index: 100;
+  }
+
+  .sticky-total-inner {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 14px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--white);
+  }
+
+  .sticky-total-label {
+    font-size: 0.9rem;
+    opacity: 0.85;
+  }
+
+  .sticky-total-amount {
+    font-size: 1.3rem;
+    font-weight: 800;
+  }
+
+  footer {
+    padding: 16px 20px 28px;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-sub);
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <div class="company">대명휴장례식장</div>
+    <h1>장례비용 예상 계산기</h1>
+    <p>미리 가늠해 보시는 것만으로도 마음의 준비에 도움이 됩니다.<br>
+      <span class="header-sub">본 계산은 참고용이며,<br>이용 시간과 선택 품목에 따라 실제 금액은 달라질 수 있습니다.</span></p>
+  </header>
+
+  <main>
+    <div id="categoryContainer">
+      <!-- 대분류 카드는 아래 PRICES.categories 기준으로 자바스크립트가 자동 생성합니다 -->
+    </div>
+
+    <div class="receipt-card">
+      <div class="receipt-title">현재 합계</div>
+      <div class="receipt-total" id="totalDisplay">0원</div>
+      <div class="receipt-list" id="receiptList">
+        <div class="receipt-empty">아직 선택하신 품목이 없습니다.</div>
+      </div>
+    </div>
+
+    <div class="cta-box">
+      <div class="cta-title">
+        위 금액은 예상 금액입니다.<br>
+        정확한 견적은 24시간 상담 053-472-0001
+      </div>
+      <a class="phone-btn" href="tel:053-472-0001">📞 지금 전화 상담하기</a>
+    </div>
+  </main>
+
+  <footer>
+    대명휴장례식장 | 대구광역시 남구 대명로86 지하1층
+  </footer>
+
+</div>
+
+<div class="sticky-total">
+  <div class="sticky-total-inner">
+    <span class="sticky-total-label">현재 예상 합계</span>
+    <span class="sticky-total-amount" id="stickyTotalAmount">0원</span>
+  </div>
+</div>
+
+<script>
+/* =====================================================
+   ★★★★★ 가격표 (여기 내용만 바꾸면 계산기에 바로 반영됩니다) ★★★★★
+   =====================================================
+   지금 들어있는 품목 이름과 가격은 전부 "임시 값"입니다.
+   실제 가격표를 받으시면, 아래 categories 안의 값들만 그대로
+   실제 이름/가격으로 바꿔 주세요. 화면 구조나 계산 방식은
+   자동으로 그대로 유지됩니다.
+
+   각 항목(item)은 두 가지 방식 중 하나로 동작합니다.
+
+   1) unit: "select"  → 등급/종류 중 하나를 고르는 방식
+      options: [ {name: "등급 이름", price: 가격}, ... ]
+      "선택 안 함"은 화면에 자동으로 추가되므로 직접 안 넣어도 됩니다.
+      - perDay: true 를 추가하면, 그 대분류의 "이용 일수" 입력값과
+        곱해집니다 (지금은 "1. 시설"의 빈소 사용료에만 사용).
+      - perGuest: true 를 추가하면, 그 대분류의 "예상 조문객 수"
+        입력값과 곱해집니다 (지금은 "4. 음식"에만 사용).
+
+   2) unit: "quantity" → 수량(벌 수/대수 등)을 입력하는 방식
+      price: 1개당 단가
+      countLabel: 수량 입력창 옆에 보여줄 단위 이름 (예: "벌 수", "대수")
+   ===================================================== */
+const PRICES = {
+
+  전화번호: "053-472-0001",
+
+  categories: [
+    {
+      id: "facility",
+      title: "1. 시설",
+      subgroups: [
+        {
+          subTitle: "1-1. 빈소",
+          items: [
+            {
+              name: "빈소",
+              unit: "select",
+              noAutoNone: true,
+              options: [
+                { name: "무빈소", price: 0 },
+                { name: "50석 (2일)", price: 1200000 },
+                { name: "70석 (2일)", price: 1600000 },
+                { name: "80석 (2일)", price: 1800000 },
+                { name: "150석 (2일)", price: 3200000 }
+              ]
+            }
+          ]
+        },
+        {
+          subTitle: "1-2. 안치실",
+          items: [
+            { name: "안치실 사용료", unit: "perDayFlat", price: 92000, daysDefault: 2, daysLabel: "안치 일수", note: "일반적으로 2일치 요금이 적용됩니다" }
+          ]
+        },
+        {
+          subTitle: "1-3. 염습·입관",
+          items: [
+            { name: "염습·입관", unit: "checkbox", price: 300000, note: "상조를 이용하시는 분들은 선택 안 하시면 됩니다" }
+          ]
+        },
+        {
+          subTitle: "1-4. 기본 시설 사용료",
+          items: [
+            {
+              name: "입관실 사용료·위생안치시트·수시·감염성폐기물처리·빈소청소비",
+              unit: "fixed",
+              price: 500000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      id: "embalming",
+      title: "2. 입관용품",
+      description: "관, 수의를 포함한 입관용품 일체입니다",
+      items: [
+        {
+          name: "입관용품",
+          unit: "select",
+          noAutoNone: true,
+          options: [
+            { name: "선택 안 함", price: 0, note: "상조를 이용하시는 분들은 선택 안 하시면 됩니다" },
+            { name: "화장용", price: 1000000, note: "고인의 체격과 종교에 따라 300,000원이 추가될 수 있습니다" },
+            { name: "매장용", price: 1500000 }
+          ]
+        }
+      ]
+    },
+    {
+      id: "jesasang",
+      title: "3. 제사상",
+      items: [
+        {
+          name: "제사상",
+          unit: "select",
+          noAutoNone: true,
+          options: [
+            { name: "선택 안 함", price: 0 },
+            { name: "빈소, 성복, 발인, 상식3", price: 1000000 },
+            { name: "빈소, 상식3", price: 500000 }
+          ]
+        }
+      ]
+    },
+    {
+      id: "food",
+      title: "4. 음식",
+      hasGuestCount: true,
+      guestCountLabel: "예상 조문객 수",
+      guestCountDefault: 50,
+      items: [
+        {
+          name: "음식",
+          unit: "select",
+          perGuest: true,
+          noAutoNone: true,
+          options: [
+            { name: "선택 안 함", price: 0 },
+            { name: "고급", price: 20000 },
+            { name: "최고급", price: 25000 }
+          ]
+        }
+      ]
+    },
+    {
+      id: "mourning",
+      title: "5. 상복",
+      description: "장례기간 3일 동안의 비용입니다",
+      items: [
+        { name: "남성용 상복", unit: "quantity", price: 60000, countLabel: "벌 수", unitName: "벌", note: "와이셔츠, 벨트 포함" },
+        { name: "여성용 상복", unit: "quantity", price: 40000, countLabel: "벌 수", unitName: "벌" }
+      ]
+    },
+    {
+      id: "bus",
+      title: "6. 영구차·리무진",
+      description: "대구명복공원까지 요금입니다. 거리와 경유지에 따라 요금이 변경됩니다",
+      items: [
+        {
+          name: "차량 선택 (중복 선택 가능)",
+          receiptName: "영구차·리무진",
+          unit: "multiCheck",
+          noneLabel: "선택 안 함",
+          options: [
+            { name: "리무진", price: 550000 },
+            { name: "중형버스", price: 400000 },
+            { name: "대형버스", price: 450000 }
+          ]
+        }
+      ]
+    },
+    {
+      id: "altar",
+      title: "7. 제단 (꽃장식)",
+      items: [
+        {
+          name: "제단 꽃장식",
+          unit: "select",
+          noAutoNone: true,
+          options: [
+            { name: "선택 안 함", price: 0 },
+            { name: "기본형", price: 300000 },
+            { name: "고급형", price: 700000 },
+            { name: "최고급형", price: 1000000 },
+            { name: "VIP", price: 1400000 }
+          ]
+        }
+      ]
+    },
+    {
+      id: "photo",
+      title: "8. 영정사진",
+      items: [
+        {
+          name: "영정사진",
+          unit: "select",
+          noAutoNone: true,
+          options: [
+            { name: "선택 안 함", price: 0 },
+            { name: "고급", price: 200000 },
+            { name: "최고급", price: 250000 }
+          ]
+        }
+      ]
+    },
+    {
+      id: "urn",
+      title: "9. 유골함",
+      items: [
+        {
+          name: "유골함",
+          unit: "select",
+          noAutoNone: true,
+          options: [
+            { name: "선택 안 함", price: 0 },
+            { name: "목함", price: 10000 },
+            { name: "고급", price: 200000 },
+            { name: "최고급", price: 500000 },
+            { name: "VIP", price: 700000 },
+            { name: "VVIP", price: 1000000 }
+          ]
+        }
+      ]
+    },
+    {
+      id: "columbarium",
+      title: "10. 2차 장지",
+      items: [
+        {
+          name: "2차 장지",
+          unit: "select",
+          noAutoNone: true,
+          options: [
+            { name: "선택 안 함", price: 0 },
+            { name: "고급", price: 1000000 },
+            { name: "최고급", price: 2000000 },
+            { name: "VIP", price: 3000000 },
+            { name: "VVIP", price: 5000000 }
+          ]
+        }
+      ]
+    },
+    {
+      id: "cremation",
+      title: "11. 화장장 비용",
+      description: "대구명복공원 기준 요금입니다",
+      items: [
+        {
+          name: "화장장 비용",
+          unit: "select",
+          noAutoNone: true,
+          options: [
+            { name: "선택 안 함", price: 0 },
+            { name: "무료 - 국가유공자·기초생활수급자", price: 0, forceInclude: true },
+            { name: "관내·대구시민", price: 180000 },
+            { name: "관외·타지역", price: 1000000 }
+          ]
+        }
+      ]
+    }
+  ]
+};
+/* ===================== 가격표 끝 ===================== */
+
+
+function formatWon(n) {
+  return n.toLocaleString("ko-KR") + "원";
+}
+
+// ---- 소분류 안의 품목 하나를 화면 요소로 만든다 (지금은 "1. 시설"
+//      소분류 전용 - select/quantity/checkbox/perDayFlat 4가지 지원) ----
+function renderItemGroup(item, key) {
+  const group = document.createElement("div");
+  group.className = "item-group";
+
+  if (item.unit === "select") {
+    const optionList = document.createElement("div");
+    optionList.className = "option-list";
+
+    // noAutoNone: true 인 경우(예: "빈소"의 "무빈소"), 옵션 목록에 이미
+    // 0원짜리 선택지가 있으므로 "선택 안 함"을 따로 추가하지 않는다.
+    const allOptions = item.noAutoNone
+      ? item.options
+      : [{ name: "선택 안 함", price: 0 }].concat(item.options);
+    const radioName = "sel_" + key;
+
+    allOptions.forEach(function (opt, oi) {
+      const optWrap = document.createElement("div");
+      optWrap.className = "option-item";
+
+      const row = document.createElement("label");
+      row.className = "option-row";
+      row.innerHTML =
+        '<input type="radio" name="' + radioName + '"' +
+        ' data-price="' + opt.price + '" data-option-name="' + opt.name + '"' +
+        (opt.forceInclude ? ' data-force-include="true"' : '') +
+        (oi === 0 ? ' checked' : '') + '>' +
+        '<span>' + opt.name + '</span>' +
+        (opt.price > 0 ? '<span class="option-price">' + formatWon(opt.price) + '</span>' : '');
+      optWrap.appendChild(row);
+
+      if (opt.note) {
+        const noteDiv = document.createElement("div");
+        noteDiv.className = "item-note option-note";
+        noteDiv.textContent = opt.note;
+        optWrap.appendChild(noteDiv);
+      }
+
+      optionList.appendChild(optWrap);
+    });
+
+    group.innerHTML = '<span class="item-name">' + item.name + '</span>';
+    group.appendChild(optionList);
+
+  } else if (item.unit === "quantity") {
+    group.innerHTML =
+      '<span class="item-name">' + item.name + '</span>' +
+      '<div class="qty-row">' +
+        '<input type="number" id="qty_' + key + '" min="0" inputmode="numeric" value="0">' +
+        '<span class="qty-price">' + item.countLabel + ' · 1' + (item.unitName || "개") + '당 ' + formatWon(item.price) + '</span>' +
+      '</div>';
+
+  } else if (item.unit === "checkbox") {
+    group.innerHTML =
+      '<label class="option-row">' +
+        '<input type="checkbox" id="chk_' + key + '">' +
+        '<span>' + item.name + '</span>' +
+        '<span class="option-price">' + formatWon(item.price) + '</span>' +
+      '</label>' +
+      (item.note ? '<div class="item-note">' + item.note + '</div>' : '');
+
+  } else if (item.unit === "perDayFlat") {
+    group.innerHTML =
+      '<span class="item-name">' + item.name + '</span>' +
+      '<div class="qty-row">' +
+        '<input type="number" id="days_' + key + '" min="0" inputmode="numeric" value="' + (item.daysDefault || 0) + '">' +
+        '<span class="qty-price">' + (item.daysLabel || "일수") + ' · 1일당 ' + formatWon(item.price) + '</span>' +
+      '</div>' +
+      (item.note ? '<div class="item-note">' + item.note + '</div>' : '');
+
+  } else if (item.unit === "fixed") {
+    // 선택 여부와 상관없이 항상 포함되는 필수 항목 - 체크박스는 항상
+    // 체크된 상태로 잠가두고(disabled), 해제할 수 없게 한다.
+    group.innerHTML =
+      '<div class="option-row fixed-row">' +
+        '<input type="checkbox" checked disabled>' +
+        '<span>' + item.name + '</span>' +
+        '<span class="badge-required">필수</span>' +
+        '<span class="option-price">' + formatWon(item.price) + '</span>' +
+      '</div>';
+  }
+
+  return group;
+}
+
+// ---- 소분류 안의 품목 하나의 현재 선택 금액을 계산한다 (없으면 null) ----
+function computeSubItemAmount(item, key) {
+  if (item.unit === "select") {
+    const checked = document.querySelector('input[name="sel_' + key + '"]:checked');
+    const price = parseInt(checked.dataset.price, 10);
+    // forceInclude: true 로 표시된 옵션(예: "무료")은 가격이 0이어도
+    // "선택 안 함"과 구분해서 항상 영수증에 표시한다.
+    if (price <= 0 && checked.dataset.forceInclude !== "true") return null;
+    return { name: item.name + "(" + checked.dataset.optionName + ")", amount: price };
+  }
+  if (item.unit === "quantity") {
+    const qty = Math.max(0, parseInt(document.getElementById("qty_" + key).value, 10) || 0);
+    if (qty <= 0) return null;
+    const lineName = item.name + " " + formatWon(item.price) + " × " + qty + item.countLabel + " =";
+    return { name: lineName, amount: item.price * qty };
+  }
+  if (item.unit === "checkbox") {
+    const checked = document.getElementById("chk_" + key).checked;
+    if (!checked) return null;
+    return { name: item.name, amount: item.price };
+  }
+  if (item.unit === "perDayFlat") {
+    const days = Math.max(0, parseInt(document.getElementById("days_" + key).value, 10) || 0);
+    if (days <= 0) return null;
+    return { name: item.name + " × " + days + "일", amount: item.price * days };
+  }
+  if (item.unit === "fixed") {
+    // 선택 여부와 무관하게 항상 합계·영수증에 포함된다.
+    return { name: item.name + " (필수)", amount: item.price };
+  }
+  return null;
+}
+
+// ---- 대분류 카드 + 품목 화면을 PRICES.categories 기준으로 자동 생성 ----
+function renderCategories() {
+  const container = document.getElementById("categoryContainer");
+  container.innerHTML = "";
+
+  PRICES.categories.forEach(function (cat, ci) {
+    const details = document.createElement("details");
+    details.className = "cat-card";
+
+    const summary = document.createElement("summary");
+    summary.innerHTML =
+      '<span>' + cat.title + '</span>' +
+      '<span class="cat-subtotal" id="catSubtotal_' + ci + '"></span>' +
+      '<span class="arrow">▶</span>';
+    details.appendChild(summary);
+
+    const body = document.createElement("div");
+    body.className = "cat-body";
+
+    if (cat.description) {
+      const descDiv = document.createElement("div");
+      descDiv.className = "cat-description";
+      descDiv.textContent = cat.description;
+      body.appendChild(descDiv);
+    }
+
+    if (cat.hasDays) {
+      const wrap = document.createElement("div");
+      wrap.className = "shared-input";
+      wrap.innerHTML =
+        '<label for="days_' + ci + '">' + cat.daysLabel + '</label>' +
+        '<input type="number" id="days_' + ci + '" min="0" inputmode="numeric" value="' + (cat.daysDefault || 0) + '">';
+      body.appendChild(wrap);
+    }
+
+    if (cat.hasGuestCount) {
+      const wrap = document.createElement("div");
+      wrap.className = "shared-input";
+      wrap.innerHTML =
+        '<label for="guests_' + ci + '">' + cat.guestCountLabel + '</label>' +
+        '<input type="number" id="guests_' + ci + '" min="0" inputmode="numeric" value="' + (cat.guestCountDefault || 0) + '">';
+      body.appendChild(wrap);
+    }
+
+    if (cat.subgroups) {
+      // ---- 소분류가 있는 대분류 (지금은 "1. 시설"만 해당) ----
+      cat.subgroups.forEach(function (sub, si) {
+        const subWrap = document.createElement("div");
+        subWrap.className = "sub-group";
+        subWrap.innerHTML = '<span class="sub-title">' + sub.subTitle + '</span>';
+
+        sub.items.forEach(function (item, ii) {
+          const key = ci + "_" + si + "_" + ii;
+          subWrap.appendChild(renderItemGroup(item, key));
+        });
+
+        body.appendChild(subWrap);
+      });
+    } else {
+      // ---- 소분류 없이 품목이 바로 나오는 대분류 (2~11번) ----
+      cat.items.forEach(function (item, ii) {
+        const group = document.createElement("div");
+        group.className = "item-group";
+
+        if (item.unit === "select") {
+          const optionList = document.createElement("div");
+          optionList.className = "option-list";
+
+          const allOptions = item.noAutoNone
+            ? item.options
+            : [{ name: "선택 안 함", price: 0 }].concat(item.options);
+          const radioName = "sel_" + ci + "_" + ii;
+
+          allOptions.forEach(function (opt, oi) {
+            const optWrap = document.createElement("div");
+            optWrap.className = "option-item";
+
+            const row = document.createElement("label");
+            row.className = "option-row";
+            row.innerHTML =
+              '<input type="radio" name="' + radioName + '"' +
+              ' data-cat="' + ci + '" data-item="' + ii + '"' +
+              ' data-price="' + opt.price + '" data-option-name="' + opt.name + '"' +
+              (opt.forceInclude ? ' data-force-include="true"' : '') +
+              (oi === 0 ? ' checked' : '') + '>' +
+              '<span>' + opt.name + '</span>' +
+              (opt.price > 0 ? '<span class="option-price">' + formatWon(opt.price) + '</span>' : '');
+            optWrap.appendChild(row);
+
+            if (opt.note) {
+              const noteDiv = document.createElement("div");
+              noteDiv.className = "item-note option-note";
+              noteDiv.textContent = opt.note;
+              optWrap.appendChild(noteDiv);
+            }
+
+            optionList.appendChild(optWrap);
+          });
+
+          group.innerHTML = '<span class="item-name">' + item.name + '</span>';
+          group.appendChild(optionList);
+        } else if (item.unit === "quantity") {
+          group.innerHTML =
+            '<span class="item-name">' + item.name + '</span>' +
+            '<div class="qty-row">' +
+              '<input type="number" id="qty_' + ci + '_' + ii + '" min="0" inputmode="numeric" value="0">' +
+              '<span class="qty-price">' + item.countLabel + ' · 1' + (item.unitName || "개") + '당 ' + formatWon(item.price) + '</span>' +
+            '</div>' +
+            (item.note ? '<div class="item-note">' + item.note + '</div>' : '');
+
+        } else if (item.unit === "multiCheck") {
+          // 여러 개를 동시에 체크할 수 있는 항목("영구차·리무진" 전용).
+          // "선택 안 함"과 실제 항목들은 서로 배타적으로 동작한다:
+          // 선택 안 함 체크 → 나머지 전부 해제 / 나머지 중 하나라도 체크 → 선택 안 함 해제.
+          group.innerHTML = '<span class="item-name">' + item.name + '</span>';
+
+          const optionList = document.createElement("div");
+          optionList.className = "option-list";
+          group.appendChild(optionList);
+
+          const noneRow = document.createElement("label");
+          noneRow.className = "option-row";
+          noneRow.innerHTML =
+            '<input type="checkbox" id="mc_' + ci + '_' + ii + '_none" checked>' +
+            '<span>' + (item.noneLabel || "선택 안 함") + '</span>';
+          optionList.appendChild(noneRow);
+          const noneCb = noneRow.querySelector("input");
+
+          const optionCbs = [];
+          item.options.forEach(function (opt, oi) {
+            const row = document.createElement("label");
+            row.className = "option-row";
+            row.innerHTML =
+              '<input type="checkbox" id="mc_' + ci + '_' + ii + '_' + oi + '"' +
+              ' data-price="' + opt.price + '" data-option-name="' + opt.name + '">' +
+              '<span>' + opt.name + '</span>' +
+              '<span class="option-price">' + formatWon(opt.price) + '</span>';
+            optionList.appendChild(row);
+            optionCbs.push(row.querySelector("input"));
+          });
+
+          noneCb.addEventListener("change", function () {
+            if (noneCb.checked) {
+              optionCbs.forEach(function (cb) { cb.checked = false; });
+            }
+          });
+          optionCbs.forEach(function (cb) {
+            cb.addEventListener("change", function () {
+              if (cb.checked) {
+                noneCb.checked = false;
+              } else if (!optionCbs.some(function (c) { return c.checked; })) {
+                noneCb.checked = true;
+              }
+            });
+          });
+        }
+
+        body.appendChild(group);
+      });
+    }
+
+    details.appendChild(body);
+    container.appendChild(details);
+  });
+}
+
+// ---- 현재 선택 상태를 기준으로 합계 + 영수증을 다시 계산해서 화면에 반영 ----
+function updateTotal() {
+  let total = 0;
+  const lines = [];
+
+  PRICES.categories.forEach(function (cat, ci) {
+    let catSubtotal = 0;
+
+    if (cat.subgroups) {
+      // ---- 소분류가 있는 대분류 (지금은 "1. 시설"만 해당) ----
+      cat.subgroups.forEach(function (sub, si) {
+        sub.items.forEach(function (item, ii) {
+          const key = ci + "_" + si + "_" + ii;
+          const result = computeSubItemAmount(item, key);
+          if (result) {
+            lines.push({ name: sub.subTitle + " · " + result.name, amount: result.amount });
+            catSubtotal += result.amount;
+          }
+        });
+      });
+    } else {
+      // ---- 소분류 없이 품목이 바로 나오는 대분류 (2~11번) ----
+      const days = cat.hasDays
+        ? Math.max(0, parseInt(document.getElementById("days_" + ci).value, 10) || 0)
+        : 1;
+      const guests = cat.hasGuestCount
+        ? Math.max(0, parseInt(document.getElementById("guests_" + ci).value, 10) || 0)
+        : 1;
+
+      cat.items.forEach(function (item, ii) {
+        if (item.unit === "select") {
+          const checked = document.querySelector(
+            'input[name="sel_' + ci + '_' + ii + '"]:checked'
+          );
+          const price = parseInt(checked.dataset.price, 10);
+          // forceInclude: true 로 표시된 옵션(예: "무료")은 가격이 0이어도
+          // "선택 안 함"과 구분해서 항상 영수증에 표시한다.
+          if (price > 0 || checked.dataset.forceInclude === "true") {
+            const multiplier = (item.perDay ? days : 1) * (item.perGuest ? guests : 1);
+            const amount = price * multiplier;
+            let lineName;
+            if (item.perGuest) {
+              // 음식처럼 "단가 × 인원"인 항목은 계산 과정이 그대로
+              // 보이도록 자세히 풀어서 적는다 (예: "음식(고급) 20,000원 × 100명 =").
+              lineName = item.name + "(" + checked.dataset.optionName + ") " +
+                formatWon(price) + " × " + guests + "명 =";
+            } else {
+              let detail = checked.dataset.optionName;
+              if (item.perDay) detail += " × " + days + "일";
+              lineName = item.name + "(" + detail + ")";
+            }
+            lines.push({ name: lineName, amount: amount });
+            catSubtotal += amount;
+          }
+        } else if (item.unit === "quantity") {
+          const qty = Math.max(0, parseInt(document.getElementById("qty_" + ci + "_" + ii).value, 10) || 0);
+          if (qty > 0) {
+            const amount = item.price * qty;
+            // 단가 × 수량 계산 과정이 그대로 보이도록 자세히 풀어서 적는다
+            // (예: "남성용 상복 60,000원 × 3벌 =").
+            const lineName = item.name + " " + formatWon(item.price) + " × " + qty + item.countLabel + " =";
+            lines.push({ name: lineName, amount: amount });
+            catSubtotal += amount;
+          }
+        } else if (item.unit === "multiCheck") {
+          // 중복 선택이 가능한 항목("영구차·리무진") - 체크된 것마다 각각
+          // 영수증에 한 줄씩 표시한다.
+          item.options.forEach(function (opt, oi) {
+            const cb = document.getElementById("mc_" + ci + "_" + ii + "_" + oi);
+            if (cb && cb.checked) {
+              lines.push({ name: (item.receiptName || item.name) + "(" + opt.name + ")", amount: opt.price });
+              catSubtotal += opt.price;
+            }
+          });
+        }
+      });
+    }
+
+    total += catSubtotal;
+    const subtotalEl = document.getElementById("catSubtotal_" + ci);
+    if (subtotalEl) {
+      subtotalEl.textContent = catSubtotal > 0 ? formatWon(catSubtotal) : "";
+    }
+  });
+
+  document.getElementById("totalDisplay").textContent = formatWon(total);
+  document.getElementById("stickyTotalAmount").textContent = formatWon(total);
+
+  const receiptList = document.getElementById("receiptList");
+  if (lines.length === 0) {
+    receiptList.innerHTML = '<div class="receipt-empty">아직 선택하신 품목이 없습니다.</div>';
+  } else {
+    receiptList.innerHTML = lines.map(function (line) {
+      return '<div class="receipt-line">' +
+        '<span class="rl-name">' + line.name + '</span>' +
+        '<span class="rl-amount">' + formatWon(line.amount) + '</span>' +
+      '</div>';
+    }).join("");
+  }
+}
+
+// ---- 초기화: 화면을 그리고, 값이 바뀔 때마다 바로 합계를 갱신 ----
+renderCategories();
+document.getElementById("categoryContainer").addEventListener("input", updateTotal);
+document.getElementById("categoryContainer").addEventListener("change", updateTotal);
+updateTotal();
+</script>
+
+</body>
+</html>
