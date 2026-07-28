@@ -511,7 +511,7 @@ const PRICES = {
               noAutoNone: true,
               onSelectChange: "updateFacilityLocks",
               options: [
-                { name: "무빈소", price: 0 },
+                { name: "무빈소", price: 0, isNoHall: true },
                 {
                   name: "무빈소 (대명휴장례식장 무빈소 패키지)",
                   price: 1990000,
@@ -529,7 +529,7 @@ const PRICES = {
         {
           subTitle: "1-2. 안치실",
           items: [
-            { name: "안치실 사용료", unit: "perDayFlat", price: 92000, daysDefault: 2, daysLabel: "안치 일수", note: "일반적으로 2일치 요금이 적용됩니다" }
+            { name: "안치실 사용료", unit: "perDayFlat", price: 92000, daysDefault: 0, daysLabel: "안치 일수", note: "일반적으로 2일치 요금이 적용됩니다" }
           ]
         },
         {
@@ -757,6 +757,7 @@ function renderItemGroup(item, key) {
         ' data-price="' + opt.price + '" data-option-name="' + opt.name + '"' +
         (opt.forceInclude ? ' data-force-include="true"' : '') +
         (opt.isPackage ? ' data-is-package="true"' : '') +
+        (opt.isNoHall ? ' data-is-no-hall="true"' : '') +
         (oi === 0 ? ' checked' : '') + '>' +
         '<span>' + opt.name + '</span>' +
         (opt.price > 0 ? '<span class="option-price">' + formatWon(opt.price) + '</span>' : '');
@@ -810,13 +811,13 @@ function renderItemGroup(item, key) {
       (item.note ? '<div class="item-note">' + item.note + '</div>' : '');
 
   } else if (item.unit === "fixed") {
-    // 기본은 선택 여부와 상관없이 항상 포함되는 필수 항목이다 - 체크박스는
-    // 항상 잠가두고(disabled) 사용자가 직접 해제할 수는 없다. 다만
-    // updateFacilityLocks() 같은 별도 로직이 무빈소 패키지 선택 시
-    // 이 체크를 프로그램적으로 꺼서 중복 계산을 막을 수 있다.
+    // "필수" 항목 - 처음에는 선택 안 된 상태로 시작하고, 실제로는
+    // updateFacilityLocks()(1-1. 빈소 선택 결과)가 이 체크박스의
+    // 체크·잠금 여부를 결정한다 (무빈소 패키지에 포함 → 잠긴 채 꺼짐,
+    // 무빈소 일반 → 자유롭게 토글, 실제 빈소 → 자동으로 켜지고 잠김).
     group.innerHTML =
       '<div class="option-row fixed-row">' +
-        '<input type="checkbox" id="fixed_' + key + '" checked disabled>' +
+        '<input type="checkbox" id="fixed_' + key + '">' +
         '<span>' + item.name + '</span>' +
         '<span class="badge-required" id="badge_' + key + '">필수</span>' +
         '<span class="option-price">' + formatWon(item.price) + '</span>' +
@@ -888,11 +889,15 @@ function setLockNote(key, show, text) {
 function updateFacilityLocks() {
   const hallChecked = document.querySelector('input[name="sel_0_0_0"]:checked');
   const isPackage = !!(hallChecked && hallChecked.dataset.isPackage === "true");
+  const isNoHall = !!(hallChecked && hallChecked.dataset.isNoHall === "true");
   const lockText = "무빈소 패키지에 포함되어 있습니다";
 
   // 1-2. 안치실 (일수 입력 - 무빈소 패키지에 2일치가 이미 포함되어
   // 있으므로, 잠글 때는 값을 0으로 만들어 합계에서 자연스럽게 빠지게
-  // 하고, 풀 때는 잠그기 직전 값으로 되돌린다)
+  // 하고, 풀 때는 잠그기 직전 값으로 되돌린다). 실제로 잠겨 있었을
+  // 때(prevValue가 있을 때)만 값을 되돌리고, 그 외에는 사용자가
+  // 입력해 둔 값을 그대로 둔다 (빈소 종류만 바꿨다고 일수가
+  // 마음대로 바뀌면 안 되기 때문).
   const storageDays = document.getElementById("days_0_1_0");
   if (storageDays) {
     if (isPackage) {
@@ -901,10 +906,12 @@ function updateFacilityLocks() {
       }
       storageDays.value = 0;
       storageDays.disabled = true;
+    } else if (storageDays.dataset.prevValue !== undefined) {
+      storageDays.disabled = false;
+      storageDays.value = storageDays.dataset.prevValue;
+      delete storageDays.dataset.prevValue;
     } else {
       storageDays.disabled = false;
-      storageDays.value = storageDays.dataset.prevValue || 2;
-      delete storageDays.dataset.prevValue;
     }
     setLockNote("0_1_0", isPackage, lockText);
   }
@@ -917,14 +924,32 @@ function updateFacilityLocks() {
     setLockNote("0_2_0", isPackage, lockText);
   }
 
-  // 1-4. 기본 시설 사용료 (평소엔 항상 필수로 체크되어 있는 항목)
+  // 1-4. 기본 시설 사용료 - 빈소 선택에 따라 세 가지 상태를 가진다.
+  //   1) 무빈소 패키지 선택: 이미 패키지에 포함되어 있으므로 잠긴
+  //      상태로 끄고 "무빈소 패키지에 포함되어 있습니다" 안내 표시.
+  //   2) 무빈소(일반, 0원) 선택: 필수가 아니므로 잠그지 않고, 필요할
+  //      때 직접 체크/해제할 수 있게 그대로 둔다.
+  //   3) 실제 빈소(50석 등) 선택: 빈소 사용에 항상 따라붙는 비용이므로
+  //      자동으로 체크하고 잠가서 해제할 수 없게 한다 ("필수" 표시).
   const fixedChk = document.getElementById("fixed_0_3_0");
-  if (fixedChk) {
-    fixedChk.checked = !isPackage;
-    setLockNote("0_3_0", isPackage, lockText);
-  }
   const badge = document.getElementById("badge_0_3_0");
-  if (badge) badge.style.display = isPackage ? "none" : "inline-block";
+  if (fixedChk) {
+    if (isPackage) {
+      fixedChk.checked = false;
+      fixedChk.disabled = true;
+      setLockNote("0_3_0", true, lockText);
+      if (badge) badge.style.display = "none";
+    } else if (isNoHall) {
+      fixedChk.disabled = false;
+      setLockNote("0_3_0", false, lockText);
+      if (badge) badge.style.display = "none";
+    } else {
+      fixedChk.checked = true;
+      fixedChk.disabled = true;
+      setLockNote("0_3_0", false, lockText);
+      if (badge) badge.style.display = "inline-block";
+    }
+  }
 
   // 2. 입관용품 (라디오 - 전부 잠그고 "선택 안 함"으로 되돌린다)
   const embalmingRadios = document.querySelectorAll('input[name="sel_1_0"]');
