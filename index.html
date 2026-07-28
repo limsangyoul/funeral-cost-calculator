@@ -207,6 +207,12 @@
     opacity: 0.6;
   }
 
+  .option-row:has(input:disabled) {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background: var(--ivory);
+  }
+
   .badge-required {
     display: inline-block;
     font-size: 0.7rem;
@@ -499,8 +505,14 @@ const PRICES = {
               name: "빈소",
               unit: "select",
               noAutoNone: true,
+              onSelectChange: "updateFacilityLocks",
               options: [
-                { name: "무빈소", price: 0 },
+                {
+                  name: "무빈소 (대명휴장례식장 무빈소 패키지)",
+                  price: 1990000,
+                  isPackage: true,
+                  note: "화장용 입관용품, 염습·입관, 입관실 사용료, 위생안치시트, 수시, 감염성폐기물처리 등 일체 포함"
+                },
                 { name: "50석 (2일)", price: 1200000 },
                 { name: "70석 (2일)", price: 1600000 },
                 { name: "80석 (2일)", price: 1800000 },
@@ -716,6 +728,7 @@ function formatWon(n) {
 function renderItemGroup(item, key) {
   const group = document.createElement("div");
   group.className = "item-group";
+  group.id = "group_" + key;
 
   if (item.unit === "select") {
     const optionList = document.createElement("div");
@@ -738,6 +751,7 @@ function renderItemGroup(item, key) {
         '<input type="radio" name="' + radioName + '"' +
         ' data-price="' + opt.price + '" data-option-name="' + opt.name + '"' +
         (opt.forceInclude ? ' data-force-include="true"' : '') +
+        (opt.isPackage ? ' data-is-package="true"' : '') +
         (oi === 0 ? ' checked' : '') + '>' +
         '<span>' + opt.name + '</span>' +
         (opt.price > 0 ? '<span class="option-price">' + formatWon(opt.price) + '</span>' : '');
@@ -752,6 +766,14 @@ function renderItemGroup(item, key) {
 
       optionList.appendChild(optWrap);
     });
+
+    if (item.onSelectChange) {
+      optionList.querySelectorAll('input[type="radio"]').forEach(function (radio) {
+        radio.addEventListener("change", function () {
+          if (radio.checked) window[item.onSelectChange]();
+        });
+      });
+    }
 
     group.innerHTML = '<span class="item-name">' + item.name + '</span>';
     group.appendChild(optionList);
@@ -783,13 +805,15 @@ function renderItemGroup(item, key) {
       (item.note ? '<div class="item-note">' + item.note + '</div>' : '');
 
   } else if (item.unit === "fixed") {
-    // 선택 여부와 상관없이 항상 포함되는 필수 항목 - 체크박스는 항상
-    // 체크된 상태로 잠가두고(disabled), 해제할 수 없게 한다.
+    // 기본은 선택 여부와 상관없이 항상 포함되는 필수 항목이다 - 체크박스는
+    // 항상 잠가두고(disabled) 사용자가 직접 해제할 수는 없다. 다만
+    // updateFacilityLocks() 같은 별도 로직이 무빈소 패키지 선택 시
+    // 이 체크를 프로그램적으로 꺼서 중복 계산을 막을 수 있다.
     group.innerHTML =
       '<div class="option-row fixed-row">' +
-        '<input type="checkbox" checked disabled>' +
+        '<input type="checkbox" id="fixed_' + key + '" checked disabled>' +
         '<span>' + item.name + '</span>' +
-        '<span class="badge-required">필수</span>' +
+        '<span class="badge-required" id="badge_' + key + '">필수</span>' +
         '<span class="option-price">' + formatWon(item.price) + '</span>' +
       '</div>';
   }
@@ -824,10 +848,69 @@ function computeSubItemAmount(item, key) {
     return { name: item.name + " × " + days + "일", amount: item.price * days };
   }
   if (item.unit === "fixed") {
-    // 선택 여부와 무관하게 항상 합계·영수증에 포함된다.
+    // 기본은 선택 여부와 무관하게 항상 포함되지만, 무빈소 패키지처럼
+    // 이미 포함하고 있는 경우 updateFacilityLocks()가 체크를 꺼서
+    // 중복 계산을 막는다 - 그 경우에는 합계·영수증에서 제외한다.
+    const cb = document.getElementById("fixed_" + key);
+    if (cb && !cb.checked) return null;
     return { name: item.name + " (필수)", amount: item.price };
   }
   return null;
+}
+
+// ---- 품목 하나(.item-group, id="group_{key}")에 잠금 안내문구를 붙이거나
+//      뗀다. 없으면 새로 만들고, show가 false면 지운다. ----
+function setLockNote(key, show, text) {
+  const container = document.getElementById("group_" + key);
+  if (!container) return;
+  let note = container.querySelector(".lock-note");
+  if (show) {
+    if (!note) {
+      note = document.createElement("div");
+      note.className = "item-note lock-note";
+      container.appendChild(note);
+    }
+    note.textContent = text;
+  } else if (note) {
+    note.remove();
+  }
+}
+
+// ---- "1-1. 빈소"에서 무빈소 패키지를 고르면, 이미 그 패키지에 포함된
+//      항목들(1-3 염습·입관 / 1-4 기본 시설 사용료 / 2. 입관용품)을
+//      자동으로 끄고 잠가서 중복 계산을 막는다. 다른 빈소를 고르면
+//      전부 원래대로 되돌린다. ----
+function updateFacilityLocks() {
+  const hallChecked = document.querySelector('input[name="sel_0_0_0"]:checked');
+  const isPackage = !!(hallChecked && hallChecked.dataset.isPackage === "true");
+  const lockText = "무빈소 패키지에 포함되어 있습니다";
+
+  // 1-3. 염습·입관 (체크박스)
+  const embalmChk = document.getElementById("chk_0_2_0");
+  if (embalmChk) {
+    embalmChk.disabled = isPackage;
+    if (isPackage) embalmChk.checked = false;
+    setLockNote("0_2_0", isPackage, lockText);
+  }
+
+  // 1-4. 기본 시설 사용료 (평소엔 항상 필수로 체크되어 있는 항목)
+  const fixedChk = document.getElementById("fixed_0_3_0");
+  if (fixedChk) {
+    fixedChk.checked = !isPackage;
+    setLockNote("0_3_0", isPackage, lockText);
+  }
+  const badge = document.getElementById("badge_0_3_0");
+  if (badge) badge.style.display = isPackage ? "none" : "inline-block";
+
+  // 2. 입관용품 (라디오 - 전부 잠그고 "선택 안 함"으로 되돌린다)
+  const embalmingRadios = document.querySelectorAll('input[name="sel_1_0"]');
+  embalmingRadios.forEach(function (radio, idx) {
+    radio.disabled = isPackage;
+    if (isPackage && idx === 0) radio.checked = true;
+  });
+  setLockNote("1_0", isPackage, lockText);
+
+  updateTotal();
 }
 
 // ---- 대분류 카드 + 품목 화면을 PRICES.categories 기준으로 자동 생성 ----
@@ -893,6 +976,7 @@ function renderCategories() {
       cat.items.forEach(function (item, ii) {
         const group = document.createElement("div");
         group.className = "item-group";
+        group.id = "group_" + ci + "_" + ii;
 
         if (item.unit === "select") {
           const optionList = document.createElement("div");
@@ -1101,7 +1185,7 @@ function updateTotal() {
 renderCategories();
 document.getElementById("categoryContainer").addEventListener("input", updateTotal);
 document.getElementById("categoryContainer").addEventListener("change", updateTotal);
-updateTotal();
+updateFacilityLocks();
 </script>
 
 </body>
