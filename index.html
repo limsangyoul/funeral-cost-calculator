@@ -511,7 +511,7 @@ const PRICES = {
               noAutoNone: true,
               onSelectChange: "updateFacilityLocks",
               options: [
-                { name: "무빈소", price: 0, isNoHall: true },
+                { name: "무빈소", price: 0 },
                 {
                   name: "무빈소 (대명휴장례식장 무빈소 패키지)",
                   price: 1990000,
@@ -527,25 +527,27 @@ const PRICES = {
           ]
         },
         {
-          subTitle: "1-2. 안치실",
+          subTitle: "1-2. 빈소선택시 시설 이용료",
+          items: [
+            {
+              name: "빈소선택시 시설 이용료",
+              unit: "checkbox",
+              price: 500000,
+              badge: "필수",
+              note: "빈소 이용 시 필수 항목입니다"
+            }
+          ]
+        },
+        {
+          subTitle: "1-3. 안치실 사용료",
           items: [
             { name: "안치실 사용료", unit: "perDayFlat", price: 92000, daysDefault: 0, daysLabel: "안치 일수", note: "일반적으로 2일치 요금이 적용됩니다" }
           ]
         },
         {
-          subTitle: "1-3. 염습·입관",
+          subTitle: "1-4. 염습·입관",
           items: [
             { name: "염습·입관", unit: "checkbox", price: 300000, note: "상조를 이용하시는 분들은 선택 안 하시면 됩니다" }
-          ]
-        },
-        {
-          subTitle: "1-4. 기본 시설 사용료",
-          items: [
-            {
-              name: "입관실 사용료·위생안치시트·수시·감염성폐기물처리·빈소청소비",
-              unit: "fixed",
-              price: 500000
-            }
           ]
         }
       ]
@@ -757,7 +759,6 @@ function renderItemGroup(item, key) {
         ' data-price="' + opt.price + '" data-option-name="' + opt.name + '"' +
         (opt.forceInclude ? ' data-force-include="true"' : '') +
         (opt.isPackage ? ' data-is-package="true"' : '') +
-        (opt.isNoHall ? ' data-is-no-hall="true"' : '') +
         (oi === 0 ? ' checked' : '') + '>' +
         '<span>' + opt.name + '</span>' +
         (opt.price > 0 ? '<span class="option-price">' + formatWon(opt.price) + '</span>' : '');
@@ -797,6 +798,7 @@ function renderItemGroup(item, key) {
       '<label class="option-row">' +
         '<input type="checkbox" id="chk_' + key + '">' +
         '<span>' + item.name + '</span>' +
+        (item.badge ? '<span class="badge-required">' + item.badge + '</span>' : '') +
         '<span class="option-price">' + formatWon(item.price) + '</span>' +
       '</label>' +
       (item.note ? '<div class="item-note">' + item.note + '</div>' : '');
@@ -889,16 +891,26 @@ function setLockNote(key, show, text) {
 function updateFacilityLocks() {
   const hallChecked = document.querySelector('input[name="sel_0_0_0"]:checked');
   const isPackage = !!(hallChecked && hallChecked.dataset.isPackage === "true");
-  const isNoHall = !!(hallChecked && hallChecked.dataset.isNoHall === "true");
   const lockText = "무빈소 패키지에 포함되어 있습니다";
 
-  // 1-2. 안치실 (일수 입력 - 무빈소 패키지에 2일치가 이미 포함되어
+  // 1-2. 빈소선택시 시설 이용료 (체크박스) - 무빈소 패키지를 선택했을
+  // 때만 이미 포함되어 있으므로 잠가서 끈다. 그 외(무빈소·실제 빈소
+  // 어느 쪽이든)에는 자동으로 체크되지 않고, 항상 사용자가 직접
+  // 체크/해제할 수 있다.
+  const facilityFeeChk = document.getElementById("chk_0_1_0");
+  if (facilityFeeChk) {
+    facilityFeeChk.disabled = isPackage;
+    if (isPackage) facilityFeeChk.checked = false;
+    setLockNote("0_1_0", isPackage, lockText);
+  }
+
+  // 1-3. 안치실 (일수 입력 - 무빈소 패키지에 2일치가 이미 포함되어
   // 있으므로, 잠글 때는 값을 0으로 만들어 합계에서 자연스럽게 빠지게
   // 하고, 풀 때는 잠그기 직전 값으로 되돌린다). 실제로 잠겨 있었을
   // 때(prevValue가 있을 때)만 값을 되돌리고, 그 외에는 사용자가
   // 입력해 둔 값을 그대로 둔다 (빈소 종류만 바꿨다고 일수가
   // 마음대로 바뀌면 안 되기 때문).
-  const storageDays = document.getElementById("days_0_1_0");
+  const storageDays = document.getElementById("days_0_2_0");
   if (storageDays) {
     if (isPackage) {
       if (storageDays.dataset.prevValue === undefined) {
@@ -913,42 +925,15 @@ function updateFacilityLocks() {
     } else {
       storageDays.disabled = false;
     }
-    setLockNote("0_1_0", isPackage, lockText);
-  }
-
-  // 1-3. 염습·입관 (체크박스)
-  const embalmChk = document.getElementById("chk_0_2_0");
-  if (embalmChk) {
-    embalmChk.disabled = isPackage;
-    if (isPackage) embalmChk.checked = false;
     setLockNote("0_2_0", isPackage, lockText);
   }
 
-  // 1-4. 기본 시설 사용료 - 빈소 선택에 따라 세 가지 상태를 가진다.
-  //   1) 무빈소 패키지 선택: 이미 패키지에 포함되어 있으므로 잠긴
-  //      상태로 끄고 "무빈소 패키지에 포함되어 있습니다" 안내 표시.
-  //   2) 무빈소(일반, 0원) 선택: 필수가 아니므로 잠그지 않고, 필요할
-  //      때 직접 체크/해제할 수 있게 그대로 둔다.
-  //   3) 실제 빈소(50석 등) 선택: 빈소 사용에 항상 따라붙는 비용이므로
-  //      자동으로 체크하고 잠가서 해제할 수 없게 한다 ("필수" 표시).
-  const fixedChk = document.getElementById("fixed_0_3_0");
-  const badge = document.getElementById("badge_0_3_0");
-  if (fixedChk) {
-    if (isPackage) {
-      fixedChk.checked = false;
-      fixedChk.disabled = true;
-      setLockNote("0_3_0", true, lockText);
-      if (badge) badge.style.display = "none";
-    } else if (isNoHall) {
-      fixedChk.disabled = false;
-      setLockNote("0_3_0", false, lockText);
-      if (badge) badge.style.display = "none";
-    } else {
-      fixedChk.checked = true;
-      fixedChk.disabled = true;
-      setLockNote("0_3_0", false, lockText);
-      if (badge) badge.style.display = "inline-block";
-    }
+  // 1-4. 염습·입관 (체크박스)
+  const embalmChk = document.getElementById("chk_0_3_0");
+  if (embalmChk) {
+    embalmChk.disabled = isPackage;
+    if (isPackage) embalmChk.checked = false;
+    setLockNote("0_3_0", isPackage, lockText);
   }
 
   // 2. 입관용품 (라디오 - 전부 잠그고 "선택 안 함"으로 되돌린다)
