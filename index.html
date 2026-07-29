@@ -627,17 +627,12 @@ const PRICES = {
       id: "helper",
       title: "5. 도우미",
       items: [
+        { name: "8시간", unit: "helperQty", price: 100000, receiptName: "도우미" },
+        { name: "10시간", unit: "helperQty", price: 120000, receiptName: "도우미" },
+        { name: "12시간", unit: "helperQty", price: 150000, receiptName: "도우미" },
         {
-          name: "도우미",
-          unit: "helper",
-          extraHourPrice: 12000,
-          guestLabel: "인원수",
-          extraHourLabel: "추가 시간(1시간당 12,000원)",
-          options: [
-            { name: "8시간", price: 100000 },
-            { name: "10시간", price: 120000 },
-            { name: "12시간", price: 150000 }
-          ]
+          unit: "note",
+          note: "추가 근무 시간이 필요하신 경우 1시간당 12,000원이 별도로 청구됩니다. 정확한 안내는 상담 시 말씀드립니다."
         }
       ]
     },
@@ -1087,56 +1082,19 @@ function renderCategories() {
             });
           });
 
-        } else if (item.unit === "helper") {
-          // 시간대 중 하나를 고르면 인원수·추가시간 입력칸이 나타나는
-          // 항목 ("도우미" 전용). "선택 안 함"이면 두 입력칸을 감춘다.
-          group.innerHTML = '<span class="item-name">' + item.name + '</span>';
-
-          const optionList = document.createElement("div");
-          optionList.className = "option-list";
-          group.appendChild(optionList);
-
-          const radioName = "sel_" + ci + "_" + ii;
-          const allOptions = [{ name: "선택 안 함", price: 0 }].concat(item.options);
-          const radios = [];
-
-          allOptions.forEach(function (opt, oi) {
-            const row = document.createElement("label");
-            row.className = "option-row";
-            row.innerHTML =
-              '<input type="radio" name="' + radioName + '"' +
-              ' data-price="' + opt.price + '" data-option-name="' + opt.name + '"' +
-              (oi === 0 ? ' checked' : '') + '>' +
-              '<span>' + opt.name + '</span>' +
-              (opt.price > 0 ? '<span class="option-price">' + formatWon(opt.price) + '</span>' : '');
-            optionList.appendChild(row);
-            radios.push(row.querySelector("input"));
-          });
-
-          const guestWrap = document.createElement("div");
-          guestWrap.className = "shared-input";
-          guestWrap.innerHTML =
-            '<label for="guest_' + ci + '_' + ii + '">' + (item.guestLabel || "인원수") + '</label>' +
-            '<input type="number" id="guest_' + ci + '_' + ii + '" min="1" inputmode="numeric" value="1">';
-          group.appendChild(guestWrap);
-
-          const extraHourWrap = document.createElement("div");
-          extraHourWrap.className = "shared-input";
-          extraHourWrap.innerHTML =
-            '<label for="extrahour_' + ci + '_' + ii + '">' + (item.extraHourLabel || "추가 시간") + '</label>' +
-            '<input type="number" id="extrahour_' + ci + '_' + ii + '" min="0" inputmode="numeric" value="0">';
-          group.appendChild(extraHourWrap);
-
-          function updateHelperVisibility() {
-            const checked = radios.find(function (r) { return r.checked; });
-            const show = !!(checked && parseInt(checked.dataset.price, 10) > 0);
-            guestWrap.style.display = show ? "block" : "none";
-            extraHourWrap.style.display = show ? "block" : "none";
-          }
-          radios.forEach(function (r) {
-            r.addEventListener("change", updateHelperVisibility);
-          });
-          updateHelperVisibility();
+        } else if (item.unit === "helperQty") {
+          // 시간대별로 각각 인원수를 따로 입력하는 항목 ("도우미" 전용).
+          // 여러 시간대를 동시에 쓰는 경우(예: 8시간 1명 + 10시간 1명)를
+          // 계산할 수 있도록 라디오 대신 항목마다 독립적인 인원수 입력칸을 둔다.
+          group.innerHTML =
+            '<span class="item-name">' + item.name + '(' + formatWon(item.price) + ') 인원수</span>' +
+            '<div class="qty-row">' +
+              '<input type="number" id="qty_' + ci + '_' + ii + '" min="0" inputmode="numeric" value="0">' +
+              '<span class="qty-price">1명당 ' + formatWon(item.price) + '</span>' +
+            '</div>';
+        } else if (item.unit === "note") {
+          // 계산에는 반영되지 않는 안내 문구 전용 항목.
+          group.innerHTML = '<div class="item-note">' + item.note + '</div>';
         }
 
         body.appendChild(group);
@@ -1222,21 +1180,13 @@ function updateTotal() {
               catSubtotal += opt.price;
             }
           });
-        } else if (item.unit === "helper") {
-          // 시간대 선택 + 인원수 + 추가시간 조합 항목 ("도우미" 전용).
-          const checked = document.querySelector('input[name="sel_' + ci + '_' + ii + '"]:checked');
-          const price = parseInt(checked.dataset.price, 10);
-          if (price > 0) {
-            const guestCount = Math.max(1, parseInt(document.getElementById("guest_" + ci + "_" + ii).value, 10) || 1);
-            const extraHours = Math.max(0, parseInt(document.getElementById("extrahour_" + ci + "_" + ii).value, 10) || 0);
-            const baseAmount = price * guestCount;
-            const extraAmount = (item.extraHourPrice || 0) * extraHours;
-            const amount = baseAmount + extraAmount;
-            let lineName = item.name + "(" + checked.dataset.optionName + "×" + guestCount + "명) " + formatWon(baseAmount);
-            if (extraHours > 0) {
-              lineName += " + 추가 " + extraHours + "시간 " + formatWon(extraAmount);
-            }
-            lineName += " =";
+        } else if (item.unit === "helperQty") {
+          // 시간대별 독립 인원수 항목 ("도우미" 전용) - 인원수가 0보다
+          // 클 때만 영수증에 표시하고, 여러 시간대를 동시에 합산한다.
+          const guestCount = Math.max(0, parseInt(document.getElementById("qty_" + ci + "_" + ii).value, 10) || 0);
+          if (guestCount > 0) {
+            const amount = item.price * guestCount;
+            const lineName = (item.receiptName || item.name) + "(" + item.name + "×" + guestCount + "명)";
             lines.push({ name: lineName, amount: amount });
             catSubtotal += amount;
           }
