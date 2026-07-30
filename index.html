@@ -620,6 +620,7 @@ const PRICES = {
     {
       id: "helper",
       title: "5. 도우미",
+      description: "(조문객이 50명 이하이면 1일에 도우미 1분이면 되고,<br><br>조문객이 50~100명 정도면 1일에 도우미 2분이면 됩니다)",
       items: [
         { name: "8시간", unit: "helperQty", price: 100000, receiptName: "도우미" },
         { name: "10시간", unit: "helperQty", price: 120000, receiptName: "도우미" },
@@ -846,7 +847,7 @@ function renderCategories() {
     if (cat.description) {
       const descDiv = document.createElement("div");
       descDiv.className = "cat-description";
-      descDiv.textContent = cat.description;
+      descDiv.innerHTML = cat.description;
       body.appendChild(descDiv);
     }
 
