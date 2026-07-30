@@ -522,6 +522,7 @@ const PRICES = {
       subgroups: [
         {
           subTitle: "1-1. 빈소",
+          note: "(빈소 선택 기준은 조문객 수÷2를 하시면 되고, 조금 더 넓고 편하게 쓰시려면 조문객 수÷1.5를 하시면 됩니다)",
           items: [
             {
               name: "빈소",
@@ -872,7 +873,8 @@ function renderCategories() {
       cat.subgroups.forEach(function (sub, si) {
         const subWrap = document.createElement("div");
         subWrap.className = "sub-group";
-        subWrap.innerHTML = '<span class="sub-title">' + sub.subTitle + '</span>';
+        subWrap.innerHTML = '<span class="sub-title">' + sub.subTitle + '</span>' +
+          (sub.note ? '<div class="item-note">' + sub.note + '</div>' : '');
 
         sub.items.forEach(function (item, ii) {
           const key = ci + "_" + si + "_" + ii;
